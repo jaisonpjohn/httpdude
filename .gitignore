@@ -21,3 +21,4 @@
 ### OS and Application Log ###
 .DS_Store
 *.log
+data/

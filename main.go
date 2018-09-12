@@ -1,19 +1,19 @@
 package main
 
 import (
-			"encoding/json"
-	"fmt"
-				"net/http"
-	"bytes"
-	"io/ioutil"
-	"flag"
-	"strings"
-	"os"
-	"encoding/csv"
 	"bufio"
-	"log"
+	"bytes"
+	"encoding/csv"
+	"encoding/json"
+	"flag"
+	"fmt"
 	"io"
-	)
+	"io/ioutil"
+	"log"
+	"net/http"
+	"os"
+	"strings"
+)
 
 type stringFlags []string
 
@@ -37,18 +37,13 @@ var headersPtr stringFlags
 var queryParamsPtr stringFlags
 var bodyParamsPtr stringFlags
 
-
 func main() {
-	headers := make(map[string]string)
-	headers["Content-Type"] = "application/json"
-	headers["Accept"] = "application/json"
-	headers["Cache-Control"] = "no-cache"
-
+	headers := map[string]string{"Content-Type": "application/json",
+		"Accept": "application/json", "Cache-Control": "no-cache"}
 
 	queryParams := make(map[string]string)
 	bodyParams := make(map[string]string)
 	var body map[string]interface{}
-
 
 	urlPtr := flag.String("url", "", "url of service")
 	bodyPtr := flag.String("body", "", "Http RequestBody")
@@ -72,49 +67,47 @@ func main() {
 	}
 
 	if bodyParamsPtr.Len() > 0 {
-		for _,bodyparamRaw := range bodyParamsPtr {
-			bodyparamArray := strings.Split(bodyparamRaw,":")
+		for _, bodyparamRaw := range bodyParamsPtr {
+			bodyparamArray := strings.Split(bodyparamRaw, ":")
 			bodyParams[bodyparamArray[0]] = bodyparamArray[1]
 		}
-		mergeBodyParams(body,bodyParams)
+		mergeBodyParams(body, bodyParams)
 	}
 
 	if queryParamsPtr.Len() > 0 {
-		for _,queryparamRaw := range queryParamsPtr {
-			queryparamArray := strings.Split(queryparamRaw,":")
+		for _, queryparamRaw := range queryParamsPtr {
+			queryparamArray := strings.Split(queryparamRaw, ":")
 			queryParams[queryparamArray[0]] = queryparamArray[1]
 		}
 	}
 
 	if headersPtr.Len() > 0 {
-		for _,headerRaw := range headersPtr {
-			headerArray := strings.Split(headerRaw,":")
+		for _, headerRaw := range headersPtr {
+			headerArray := strings.Split(headerRaw, ":")
 			headers[headerArray[0]] = headerArray[1]
 		}
 	}
 
-
 	if *filePtr != "" {
-		mergeFileContent(*filePtr,body,headers,queryParams, *methodPtr, *urlPtr)
+		mergeFileContent(*filePtr, body, headers, queryParams, *methodPtr, *urlPtr)
 	}
 
 }
 
 func mergeFileContent(filePath string, body map[string]interface{},
-headers map[string]string, queryParams map[string]string, methodParam string, url string)  {
+	headers map[string]string, queryParams map[string]string, methodParam string, url string) {
 
 	bodyIndex := -1
-	headerNames:=make(map[string]int)
-	queryParamNames:=make(map[string]int)
-	bodyParamNames:=make(map[string]int)
-	metaParamNames:=make(map[string]int)
-
+	headerNames := make(map[string]int)
+	queryParamNames := make(map[string]int)
+	bodyParamNames := make(map[string]int)
+	metaParamNames := make(map[string]int)
 
 	csvFile, _ := os.Open(filePath)
 	reader := csv.NewReader(bufio.NewReader(csvFile))
 
 	line, error := reader.Read()
-	fmt.Println("First LIne: " +strings.Join(line,","))
+	fmt.Println("First LIne: " + strings.Join(line, ","))
 
 	if error != nil {
 		log.Fatal(error)
@@ -122,28 +115,26 @@ headers map[string]string, queryParams map[string]string, methodParam string, ur
 
 	queryParamsKeys := make([]string, 0)
 
-	for index,column := range line {
-		column =  strings.Trim(column,string('\uFEFF'))
+	for index, column := range line {
+		column = strings.Trim(column, string('\uFEFF'))
 		fmt.Println(column)
-		if "body" == column{
+		if "body" == column {
 			bodyIndex = index
-		} else if strings.HasPrefix(column,"h-"){
-			headerNames[strings.TrimPrefix(column,"h-")] = index
-		} else if strings.HasPrefix(column,"bp-"){
-			bodyParamNames[strings.TrimPrefix(column,"qp-")] = index
-		} else if strings.HasPrefix(column,"meta-"){
-			metaParamNames[strings.TrimPrefix(column,"meta-")] = index
-		} else if strings.HasPrefix(column,"qp-"){
-			queryParamNames[strings.TrimPrefix(column,"qp-")] = index
-			queryParamsKeys = append(queryParamsKeys, strings.TrimPrefix(column,"qp-"))
+		} else if strings.HasPrefix(column, "h-") {
+			headerNames[strings.TrimPrefix(column, "h-")] = index
+		} else if strings.HasPrefix(column, "bp-") {
+			bodyParamNames[strings.TrimPrefix(column, "qp-")] = index
+		} else if strings.HasPrefix(column, "meta-") {
+			metaParamNames[strings.TrimPrefix(column, "meta-")] = index
+		} else if strings.HasPrefix(column, "qp-") {
+			queryParamNames[strings.TrimPrefix(column, "qp-")] = index
+			queryParamsKeys = append(queryParamsKeys, strings.TrimPrefix(column, "qp-"))
 		} else {
 			// Only sane choice
 			queryParamNames[column] = index
 			queryParamsKeys = append(queryParamsKeys, column)
 		}
 	}
-
-
 
 	file, err := os.Create("result.csv")
 	checkError("Cannot create file", err)
@@ -152,39 +143,38 @@ headers map[string]string, queryParams map[string]string, methodParam string, ur
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-
 	for {
 		line, error := reader.Read()
-		fmt.Println("LIne: " +strings.Join(line,","))
+		fmt.Println("LIne: " + strings.Join(line, ","))
 		if error == io.EOF {
 			break
 		} else if error != nil {
 			log.Fatal(error)
 		}
 
-		if bodyIndex>-1 {
+		if bodyIndex > -1 {
 			//bodyFromFile := make(map[string]interface{})
 			json.Unmarshal([]byte(line[bodyIndex]), &body)
 		}
 
-		for key,val := range bodyParamNames {
-			body[key] = line[val];
+		for key, val := range bodyParamNames {
+			body[key] = line[val]
 		}
 
-		for key,val := range headerNames {
-			headers[key] = line[val];
+		for key, val := range headerNames {
+			headers[key] = line[val]
 		}
-		for key,val := range queryParamNames {
-			queryParams[key] = line[val];
+		for key, val := range queryParamNames {
+			queryParams[key] = line[val]
 		}
 		fmt.Println("Below queryParamNames")
 
 		fmt.Println(queryParamNames)
 
 		method := "GET"
-		if methodParam !="" {
+		if methodParam != "" {
 			method = methodParam
-		} else if len(body) >0{
+		} else if len(body) > 0 {
 			method = "POST"
 		}
 
@@ -192,17 +182,16 @@ headers map[string]string, queryParams map[string]string, methodParam string, ur
 		fmt.Println(string(bodyJson))
 
 		req, err := http.NewRequest(method, url, bytes.NewBuffer(bodyJson))
-		for key,val := range headers {
+		for key, val := range headers {
 			req.Header.Set(key, val)
 		}
 
 		q := req.URL.Query()
-		for key,val := range queryParams {
+		for key, val := range queryParams {
 			q.Add(key, val)
 		}
 		req.URL.RawQuery = q.Encode()
 		fmt.Println(req.URL.String())
-
 
 		client := &http.Client{}
 		resp, err := client.Do(req)
@@ -216,11 +205,9 @@ headers map[string]string, queryParams map[string]string, methodParam string, ur
 		respBody, _ := ioutil.ReadAll(resp.Body)
 		var output []string
 
-
 		for _, key := range queryParamsKeys {
 			output = append(output, key+"-"+queryParams[key])
 		}
-
 
 		output = append(output, string(respBody))
 		fmt.Println("response Body:", string(respBody))
@@ -230,8 +217,8 @@ headers map[string]string, queryParams map[string]string, methodParam string, ur
 	}
 }
 
-func mergeBodyParams (body map[string]interface{}, bodyParams map[string]string){
-	for k,v := range bodyParams {
+func mergeBodyParams(body map[string]interface{}, bodyParams map[string]string) {
+	for k, v := range bodyParams {
 		body[k] = v
 	}
 }
